@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>정처산기 실기 감자</title>
+<style>
+  :root{
+    --bg:#101820;--panel:#182430;--panel2:#1e2c3a;--line:#2a3946;
+    --text:#eaf1f7;--sub:#8ba0b2;--mint:#3ddc97;--mint-dim:#245a45;--warn:#ff8a65;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Noto Sans KR',sans-serif;padding-bottom:76px;min-height:100vh;}
+  header{padding:20px 18px 14px;position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--line);}
+  header h1{margin:0;font-size:19px;font-weight:800;}
+  header p{margin:4px 0 0;color:var(--sub);font-size:12.5px;}
+  main{padding:16px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;}
+  pre{background:#0b1218;border-radius:10px;padding:14px;overflow-x:auto;font-size:13px;line-height:1.55;border:1px solid var(--line);color:#c9e6ff;}
+  .tag{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;background:var(--mint-dim);color:var(--mint);font-weight:700;margin-bottom:8px;}
+  input[type=text]{width:100%;padding:13px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:15px;margin-top:10px;}
+  input[type=text]:focus{outline:2px solid var(--mint);}
+  button{font-family:inherit;border:none;border-radius:10px;padding:13px 16px;font-size:14.5px;font-weight:700;cursor:pointer;}
+  .btn-main{background:var(--mint);color:#06251b;width:100%;margin-top:10px;}
+  .btn-ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line);width:100%;margin-top:10px;}
+  .result-ok{color:var(--mint);font-weight:700;}
+  .result-bad{color:var(--warn);font-weight:700;}
+  .explain{margin-top:10px;padding:12px;background:var(--panel2);border-radius:10px;font-size:13.5px;color:var(--sub);line-height:1.5;}
+  .menu-item{display:flex;justify-content:space-between;align-items:center;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:10px;cursor:pointer;}
+  .menu-item .t{font-weight:700;font-size:15.5px;}
+  .menu-item .d{font-size:12.5px;color:var(--sub);margin-top:2px;}
+  nav.tabbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:20;}
+  nav.tabbar button{flex:1;background:none;border-radius:10px;padding:8px 2px;color:var(--sub);font-size:11px;font-weight:600;}
+  nav.tabbar button.active{color:var(--mint);background:var(--mint-dim);}
+  .barwrap{background:#0b1218;border-radius:6px;height:9px;overflow:hidden;}
+  .barfill{background:var(--mint);height:100%;border-radius:6px;}
+  .statrow{display:flex;justify-content:space-between;font-size:13px;margin-top:8px;color:var(--sub);}
+  .statrow b{color:var(--text);}
+  .progresstext{font-size:12px;color:var(--sub);margin-bottom:4px;}
+  .flash-front{font-size:20px;font-weight:800;text-align:center;padding:30px 10px;}
+  .center{text-align:center;}
+  .big-pct{font-size:38px;font-weight:900;color:var(--mint);}
+  h2.section{font-size:15px;color:var(--sub);margin:22px 0 10px 2px;font-weight:700;}
+  .empty{color:var(--sub);text-align:center;padding:30px 10px;font-size:13.5px;}
+  .spinner{text-align:center;padding:40px 0;color:var(--sub);}
+</style>
+</head>
+<body>
+<header style="display:flex;justify-content:space-between;align-items:flex-start;">
+  <div>
+    <h1>🥔 정처산기 실기 학습</h1>
+    <p>서버와 실시간 동기화 · 언제 어디서나</p>
+  </div>
+  <a href="/admin" style="color:var(--sub);text-decoration:none;font-size:20px;padding:4px 2px;">⚙️</a>
+</header>
+<main id="app"><div class="spinner">불러오는 중...</div></main>
+<nav class="tabbar">
+  <button data-tab="home" class="active">🏠 홈</button>
+  <button data-tab="code">💻 코드</button>
+  <button data-tab="sql">🗄 SQL</button>
+  <button data-tab="etc">🖥 OS/네트</button>
+  <button data-tab="term">📇 용어</button>
+  <button data-tab="dash">📊 대시보드</button>
+</nav>
+
+<script>
+const API = ""; // 같은 도메인이면 빈 문자열
+let state = {tab:"home", session:null};
+
+function escapeHtml(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.querySelectorAll('nav.tabbar button').forEach(b=>{
+  b.onclick = ()=>setTab(b.dataset.tab);
+});
+function setTab(tab){
+  state.tab = tab; state.session = null;
+  document.querySelectorAll('nav.tabbar button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  render();
+}
+async function render(){
+  const app = document.getElementById('app');
+  if(state.tab==='home') return renderHome();
+  if(state.tab==='code' || state.tab==='sql' || state.tab==='etc') return renderQuizList(state.tab);
+  if(state.tab==='term') return renderTermList();
+  if(state.tab==='dash') return renderDash();
+}
+
+const KIND_LABEL = {code:'코드 트레이싱', sql:'SQL 작성', etc:'OS/네트워크/테스트'};
+
+function renderHome(){
+  document.getElementById('app').innerHTML = `
+    <div class="card">
+      <div class="tag">서버 연결됨 🟢</div>
+      <div style="font-size:14px;color:var(--sub);line-height:1.6">
+        문제는 서버에서 실시간으로 받아와요. 코드 문제 일부는 매번 숫자가 바뀌어서 나와요.
+      </div>
+    </div>
+    <div class="menu-item" onclick="setTab('code')"><div><div class="t">💻 코드 트레이싱</div><div class="d">고정 문제 + 매번 다른 숫자 자동생성 문제</div></div></div>
+    <div class="menu-item" onclick="setTab('sql')"><div><div class="t">🗄 SQL 작성 연습</div><div class="d">DDL/DML/DCL, 조인, 서브쿼리 등</div></div></div>
+    <div class="menu-item" onclick="setTab('etc')"><div><div class="t">🖥 OS/네트워크/테스트</div><div class="d">스케줄링·페이지교체 계산, 서브넷, 테스트기법 등</div></div></div>
+    <div class="menu-item" onclick="setTab('term')"><div><div class="t">📇 용어 플래시카드</div><div class="d">핵심 키워드 복습</div></div></div>
+    <div class="menu-item" onclick="setTab('dash')"><div><div class="t">📊 결과 대시보드</div><div class="d">서버에 쌓인 전체 기록 분석</div></div></div>
+  `;
+}
+
+async function renderQuizList(kind){
+  document.getElementById('app').innerHTML = `<div class="spinner">문제 불러오는 중...</div>`;
+  const [res, wrongRes] = await Promise.all([
+    fetch(`${API}/api/problems?kind=${kind}`),
+    fetch(`${API}/api/problems?kind=${kind}&wrong=1`),
+  ]);
+  const problems = await res.json();
+  const wrongProblems = await wrongRes.json();
+  document.getElementById('app').innerHTML = `
+    <div class="card">
+      <div class="tag">${KIND_LABEL[kind]||kind}</div>
+      <div style="font-size:13.5px;color:var(--sub);margin-bottom:6px">서버에서 ${problems.length}문제 수신</div>
+      <button class="btn-main" onclick='startQuiz(${JSON.stringify(kind)}, ${JSON.stringify(problems)})'>퀴즈 시작</button>
+      <button class="btn-ghost" ${wrongProblems.length===0?'disabled':''} onclick='startQuiz(${JSON.stringify(kind)}, ${JSON.stringify(wrongProblems)})'>❌ 오답만 복습 (${wrongProblems.length})</button>
+    </div>
+  `;
+}
+
+function startQuiz(kind, problems){
+  problems = problems.sort(()=>Math.random()-0.5);
+  state.session = {kind, list:problems, idx:0, correct:0, showAnswer:false};
+  renderQuizStep();
+}
+
+async function renderQuizStep(){
+  const s = state.session;
+  const app = document.getElementById('app');
+  if(s.idx >= s.list.length){
+    await fetch(`${API}/api/session`, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mode:s.kind, total:s.list.length, correct:s.correct})});
+    app.innerHTML = `
+      <div class="card center">
+        <div class="tag">결과</div>
+        <div class="big-pct">${Math.round(s.correct/s.list.length*100)}%</div>
+        <div style="color:var(--sub);margin-top:6px">${s.list.length}문제 중 ${s.correct}개 정답</div>
+        <button class="btn-main" onclick="setTab('${s.kind}')">목록으로</button>
+      </div>`;
+    return;
+  }
+  const p = s.list[s.idx];
+  app.innerHTML = `
+    <div class="card">
+      <div class="progresstext">${s.idx+1} / ${s.list.length}</div>
+      <div class="barwrap"><div class="barfill" style="width:${s.idx/s.list.length*100}%"></div></div>
+      ${p.lang && p.kind==='code'? `<div class="tag" style="margin-top:14px">${escapeHtml(p.lang)}</div><pre>${escapeHtml(p.prompt)}</pre>` : `<div class="tag" style="margin-top:14px">${KIND_LABEL[p.kind]||p.kind}</div><div style="margin-top:8px;font-size:14.5px;line-height:1.6">${escapeHtml(p.prompt)}</div>`}
+      <input type="text" id="ansInput" placeholder="답 입력" autocomplete="off">
+      <button class="btn-main" onclick="submitAnswer()">제출</button>
+      <div id="feedback"></div>
+    </div>
+  `;
+  const inp = document.getElementById('ansInput');
+  inp.focus();
+  inp.onkeydown = (e)=>{ if(e.key==='Enter') submitAnswer(); };
+}
+
+function normalize(s){ return (s||'').replace(/\s+/g,'').toLowerCase(); }
+
+async function submitAnswer(){
+  const s = state.session;
+  const btn = document.querySelector('.btn-main');
+  if(s.showAnswer){ s.idx++; s.showAnswer=false; renderQuizStep(); return; }
+  const p = s.list[s.idx];
+  const val = document.getElementById('ansInput').value.trim();
+  const correct = normalize(val) === normalize(p.answer);
+  if(correct) s.correct++;
+
+  await fetch(`${API}/api/attempt`, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id:p.id, kind:p.kind, tag:p.lang||KIND_LABEL[p.kind]||p.kind, correct})});
+
+  s.showAnswer = true;
+  document.getElementById('feedback').innerHTML = `
+    <div style="margin-top:12px" class="${correct?'result-ok':'result-bad'}">${correct? '✅ 정답!' : '❌ 오답 · 정답: '+escapeHtml(p.answer)}</div>
+    <div class="explain">${escapeHtml(p.explain||'')}</div>
+  `;
+  btn.textContent = (s.idx+1 < s.list.length) ? '다음 문제 →' : '결과 보기';
+}
+
+async function renderTermList(){
+  document.getElementById('app').innerHTML = `<div class="spinner">불러오는 중...</div>`;
+  const res = await fetch(`${API}/api/problems?kind=term`);
+  const terms = await res.json();
+  const shuffled = terms.sort(()=>Math.random()-0.5);
+  state.termSession = {list:shuffled, idx:0, flipped:false};
+  renderTermCard();
+}
+function renderTermCard(){
+  const t = state.termSession;
+  const app = document.getElementById('app');
+  if(t.idx >= t.list.length){
+    app.innerHTML = `<div class="card center"><div class="tag">완료!</div><div style="color:var(--sub)">용어 ${t.list.length}개 복습 끝</div>
+      <button class="btn-main" onclick="setTab('term')">다시 시작</button></div>`;
+    return;
+  }
+  const c = t.list[t.idx];
+  app.innerHTML = `
+    <div class="card">
+      <div class="progresstext">${t.idx+1} / ${t.list.length}</div>
+      <div class="barwrap"><div class="barfill" style="width:${t.idx/t.list.length*100}%"></div></div>
+      <div class="flash-front">${escapeHtml(c.prompt)}</div>
+      ${t.flipped ? `<div class="explain" style="font-size:14px;text-align:center">${escapeHtml(c.answer)}</div>` : ''}
+      ${!t.flipped ? `<button class="btn-main" onclick="flipCard()">정의 확인하기</button>` :
+        `<button class="btn-ghost" onclick="termNext(false)">몰랐어요</button>
+         <button class="btn-main" onclick="termNext(true)">알고 있었어요</button>`}
+    </div>`;
+}
+function flipCard(){ state.termSession.flipped = true; renderTermCard(); }
+async function termNext(known){
+  const c = state.termSession.list[state.termSession.idx];
+  await fetch(`${API}/api/attempt`, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id:c.id, kind:'term', tag:'용어', correct:known})});
+  state.termSession.idx++; state.termSession.flipped=false;
+  renderTermCard();
+}
+
+async function renderDash(){
+  document.getElementById('app').innerHTML = `<div class="spinner">불러오는 중...</div>`;
+  const res = await fetch(`${API}/api/dashboard`);
+  const d = await res.json();
+  const app = document.getElementById('app');
+  if(!d.total){
+    app.innerHTML = `<div class="card empty">아직 풀이 기록이 없어요.<br>문제를 먼저 풀어보세요!</div>`;
+    return;
+  }
+  const tagRows = Object.entries(d.by_tag).sort((x,y)=>(x[1].c/x[1].t)-(y[1].c/y[1].t))
+    .map(([tag,s])=>{
+      const pct = Math.round(s.c/s.t*100);
+      return `<div style="margin-bottom:12px"><div class="statrow"><span>${escapeHtml(tag)}</span><b>${pct}% (${s.c}/${s.t})</b></div>
+        <div class="barwrap"><div class="barfill" style="width:${pct}%"></div></div></div>`;
+    }).join('');
+  const sessRows = d.sessions.map(s=>{
+    const dt = new Date(s.time);
+    return `<div style="margin-bottom:10px"><div class="statrow"><span>${dt.getMonth()+1}/${dt.getDate()} · ${escapeHtml(s.mode)}</span><b>${s.acc}%</b></div>
+      <div class="barwrap"><div class="barfill" style="width:${s.acc}%"></div></div></div>`;
+  }).join('') || `<div class="empty" style="padding:10px 0">세션 없음</div>`;
+  const topFail = d.top_fail.map(f=>`<div class="statrow"><span>${escapeHtml(f.preview)}</span><b>${f.count}회 오답</b></div>`).join('') || `<div class="empty">없음 👍</div>`;
+  const overallAcc = Math.round(d.correct/d.total*100);
+  app.innerHTML = `
+    <div class="card center"><div class="tag">종합 정답률</div><div class="big-pct">${overallAcc}%</div>
+      <div style="color:var(--sub);font-size:12.5px;margin-top:4px">누적 ${d.total}문제 풀이</div></div>
+    <h2 class="section">영역별 정답률</h2><div class="card">${tagRows}</div>
+    <h2 class="section">최근 세션</h2><div class="card">${sessRows}</div>
+    <h2 class="section">자주 틀리는 문제 TOP</h2><div class="card">${topFail}</div>
+  `;
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>정처산기 · 문제 관리</title>
+<style>
+  :root{
+    --bg:#101820;--panel:#182430;--panel2:#1e2c3a;--line:#2a3946;
+    --text:#eaf1f7;--sub:#8ba0b2;--mint:#3ddc97;--mint-dim:#245a45;--warn:#ff8a65;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Noto Sans KR',sans-serif;padding-bottom:40px;min-height:100vh;}
+  header{padding:20px 18px 14px;position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  header h1{margin:0;font-size:18px;font-weight:800;}
+  a.back{color:var(--sub);text-decoration:none;font-size:13px;}
+  main{padding:16px;max-width:640px;margin:0 auto;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;}
+  label{display:block;font-size:12.5px;color:var(--sub);margin-bottom:6px;font-weight:600;}
+  input[type=text],input[type=password],textarea,select{width:100%;padding:12px 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:14px;margin-bottom:12px;font-family:inherit;}
+  textarea{min-height:200px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.5;resize:vertical;}
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--mint);}
+  button{font-family:inherit;border:none;border-radius:10px;padding:13px 16px;font-size:14.5px;font-weight:700;cursor:pointer;}
+  .btn-main{background:var(--mint);color:#06251b;width:100%;}
+  .btn-ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line);width:100%;margin-top:8px;}
+  .btn-danger{background:transparent;color:var(--warn);border:1px solid var(--warn);padding:6px 10px;font-size:12px;font-weight:700;}
+  .tag{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;background:var(--mint-dim);color:var(--mint);font-weight:700;margin-bottom:8px;}
+  .msg{margin-top:10px;font-size:13px;line-height:1.5;}
+  .msg.ok{color:var(--mint);}
+  .msg.err{color:var(--warn);}
+  .prob-row{border-bottom:1px solid var(--line);padding:10px 0;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+  .prob-row:last-child{border-bottom:none;}
+  .prob-main{flex:1;min-width:0;}
+  .prob-prompt{font-size:13px;white-space:pre-wrap;word-break:break-word;color:var(--text);}
+  .prob-meta{font-size:11px;color:var(--sub);margin-bottom:4px;}
+  .toolbar{display:flex;gap:8px;margin-bottom:10px;}
+  .toolbar select{margin-bottom:0;}
+  .empty{color:var(--sub);text-align:center;padding:20px 0;font-size:13px;}
+  .sub{font-size:12.5px;color:var(--sub);line-height:1.6;margin-bottom:10px;}
+  code{background:var(--panel2);padding:2px 6px;border-radius:5px;font-size:12px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚙️ 문제 관리</h1>
+  <a class="back" href="/">← 홈으로</a>
+</header>
+<main>
+  <div class="card">
+    <div class="tag">관리자 키</div>
+    <div class="sub">Render 환경변수 <code>ADMIN_KEY</code>와 같은 값을 입력하세요. 이 브라우저에만 저장돼요.</div>
+    <input type="password" id="adminKey" placeholder="admin key" autocomplete="off">
+    <button class="btn-ghost" onclick="saveKey()">키 저장</button>
+  </div>
+
+  <div class="card">
+    <div class="tag">문제 붙여넣고 바로 추가</div>
+    <div class="sub">
+      <code>문제추가_프롬프트.md</code>로 다른 Claude 대화에서 만든 JSON 결과를
+      (curl 없이) 아래에 그대로 붙여넣고 추가 버튼을 누르면 서버 DB에 바로 반영돼요.
+      <code>admin_key</code> 필드는 있어도 없어도 됩니다 (위 키를 자동으로 사용).
+    </div>
+    <textarea id="jsonInput" placeholder='{"problems":[{"kind":"code","lang":"Java","prompt":"...","answer":"...","explain":"..."}]}'></textarea>
+    <button class="btn-main" onclick="submitProblems()">서버에 추가</button>
+    <div id="addMsg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <div class="tag">등록된 문제</div>
+    <div class="toolbar">
+      <select id="kindFilter" onchange="loadProblems()">
+        <option value="">전체</option>
+        <option value="code">코드</option>
+        <option value="sql">SQL</option>
+        <option value="etc">OS/네트워크/테스트</option>
+        <option value="term">용어</option>
+      </select>
+      <button class="btn-ghost" style="width:auto;margin-top:0" onclick="loadProblems()">새로고침</button>
+    </div>
+    <div id="probList"><div class="empty">키를 입력하고 새로고침을 눌러주세요.</div></div>
+  </div>
+</main>
+
+<script>
+const API = "";
+
+function getKey(){ return localStorage.getItem('admin_key') || ''; }
+function saveKey(){
+  const v = document.getElementById('adminKey').value.trim();
+  localStorage.setItem('admin_key', v);
+  document.getElementById('adminKey').value = v;
+  loadProblems();
+}
+document.getElementById('adminKey').value = getKey();
+
+function escapeHtml(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function submitProblems(){
+  const msgEl = document.getElementById('addMsg');
+  msgEl.textContent = ''; msgEl.className = 'msg';
+  const raw = document.getElementById('jsonInput').value.trim();
+  if(!raw){ msgEl.textContent = 'JSON을 붙여넣어 주세요.'; msgEl.className='msg err'; return; }
+  let data;
+  try{ data = JSON.parse(raw); }
+  catch(e){ msgEl.textContent = 'JSON 형식이 올바르지 않아요: ' + e.message; msgEl.className='msg err'; return; }
+  if(!data.admin_key) data.admin_key = getKey();
+  if(!Array.isArray(data.problems)){ msgEl.textContent = '"problems" 배열이 필요해요.'; msgEl.className='msg err'; return; }
+
+  try{
+    const res = await fetch(`${API}/api/admin/add_problems`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+    });
+    if(res.status === 401){ msgEl.textContent = '❌ 관리자 키가 틀렸어요.'; msgEl.className='msg err'; return; }
+    const r = await res.json();
+    msgEl.textContent = `✅ 추가 ${r.added}건 · 중복/스킵 ${r.skipped}건 · 전체 ${r.total_now}문제`;
+    msgEl.className = 'msg ok';
+    document.getElementById('jsonInput').value = '';
+    loadProblems();
+  }catch(e){
+    msgEl.textContent = '요청 실패: ' + e.message;
+    msgEl.className = 'msg err';
+  }
+}
+
+async function loadProblems(){
+  const listEl = document.getElementById('probList');
+  const key = getKey();
+  if(!key){ listEl.innerHTML = `<div class="empty">먼저 관리자 키를 입력하세요.</div>`; return; }
+  listEl.innerHTML = `<div class="empty">불러오는 중...</div>`;
+  const kind = document.getElementById('kindFilter').value;
+  const qs = new URLSearchParams({admin_key:key});
+  if(kind) qs.set('kind', kind);
+  const res = await fetch(`${API}/api/admin/problems?${qs.toString()}`);
+  if(res.status === 401){ listEl.innerHTML = `<div class="empty">❌ 키가 틀렸어요.</div>`; return; }
+  const problems = await res.json();
+  if(!problems.length){ listEl.innerHTML = `<div class="empty">문제가 없어요.</div>`; return; }
+  listEl.innerHTML = problems.map(p => `
+    <div class="prob-row">
+      <div class="prob-main">
+        <div class="prob-meta">#${p.id} · ${escapeHtml(p.kind)}${p.lang? ' · '+escapeHtml(p.lang):''}</div>
+        <div class="prob-prompt">${escapeHtml(p.prompt.slice(0,120))}${p.prompt.length>120?'…':''}</div>
+      </div>
+      <button class="btn-danger" onclick="deleteProblem(${p.id})">삭제</button>
+    </div>
+  `).join('');
+}
+
+async function deleteProblem(id){
+  if(!confirm('이 문제를 삭제할까요?')) return;
+  const key = getKey();
+  const res = await fetch(`${API}/api/admin/problems/${id}?admin_key=${encodeURIComponent(key)}`, {method:'DELETE'});
+  if(res.ok) loadProblems();
+  else alert('삭제 실패');
+}
+
+if(getKey()) loadProblems();
+</script>
+</body>
+</html>
