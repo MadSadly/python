@@ -106,21 +106,33 @@ function renderHome(){
 }
 
 async function renderQuizList(kind){
-  document.getElementById('app').innerHTML = `<div class="spinner">문제 불러오는 중...</div>`;
-  const [res, wrongRes] = await Promise.all([
-    fetch(`${API}/api/problems?kind=${kind}`),
-    fetch(`${API}/api/problems?kind=${kind}&wrong=1`),
-  ]);
-  const problems = await res.json();
-  const wrongProblems = await wrongRes.json();
-  document.getElementById('app').innerHTML = `
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="spinner">문제 불러오는 중...</div>`;
+  let problems, wrongProblems;
+  try{
+    const [res, wrongRes] = await Promise.all([
+      fetch(`${API}/api/problems?kind=${kind}`),
+      fetch(`${API}/api/problems?kind=${kind}&wrong=1`),
+    ]);
+    if(!res.ok || !wrongRes.ok) throw new Error('서버 응답 오류');
+    problems = await res.json();
+    wrongProblems = await wrongRes.json();
+  }catch(err){
+    app.innerHTML = `<div class="card empty">문제를 불러오지 못했어요.<br>${escapeHtml(err.message||'')}</div>
+      <button class="btn-ghost" id="retryBtn">다시 시도</button>`;
+    document.getElementById('retryBtn').addEventListener('click', ()=>renderQuizList(kind));
+    return;
+  }
+  app.innerHTML = `
     <div class="card">
       <div class="tag">${KIND_LABEL[kind]||kind}</div>
       <div style="font-size:13.5px;color:var(--sub);margin-bottom:6px">서버에서 ${problems.length}문제 수신</div>
-      <button class="btn-main" onclick='startQuiz(${JSON.stringify(kind)}, ${JSON.stringify(problems)})'>퀴즈 시작</button>
-      <button class="btn-ghost" ${wrongProblems.length===0?'disabled':''} onclick='startQuiz(${JSON.stringify(kind)}, ${JSON.stringify(wrongProblems)})'>❌ 오답만 복습 (${wrongProblems.length})</button>
+      <button class="btn-main" id="startAllBtn">퀴즈 시작</button>
+      <button class="btn-ghost" id="startWrongBtn" ${wrongProblems.length===0?'disabled':''}>❌ 오답만 복습 (${wrongProblems.length})</button>
     </div>
   `;
+  document.getElementById('startAllBtn').addEventListener('click', ()=>startQuiz(kind, problems));
+  document.getElementById('startWrongBtn').addEventListener('click', ()=>startQuiz(kind, wrongProblems));
 }
 
 function startQuiz(kind, problems){
@@ -183,9 +195,19 @@ async function submitAnswer(){
 }
 
 async function renderTermList(){
-  document.getElementById('app').innerHTML = `<div class="spinner">불러오는 중...</div>`;
-  const res = await fetch(`${API}/api/problems?kind=term`);
-  const terms = await res.json();
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="spinner">불러오는 중...</div>`;
+  let terms;
+  try{
+    const res = await fetch(`${API}/api/problems?kind=term`);
+    if(!res.ok) throw new Error('서버 응답 오류');
+    terms = await res.json();
+  }catch(err){
+    app.innerHTML = `<div class="card empty">용어를 불러오지 못했어요.<br>${escapeHtml(err.message||'')}</div>
+      <button class="btn-ghost" id="retryBtn">다시 시도</button>`;
+    document.getElementById('retryBtn').addEventListener('click', renderTermList);
+    return;
+  }
   const shuffled = terms.sort(()=>Math.random()-0.5);
   state.termSession = {list:shuffled, idx:0, flipped:false};
   renderTermCard();
@@ -220,10 +242,19 @@ async function termNext(known){
 }
 
 async function renderDash(){
-  document.getElementById('app').innerHTML = `<div class="spinner">불러오는 중...</div>`;
-  const res = await fetch(`${API}/api/dashboard`);
-  const d = await res.json();
   const app = document.getElementById('app');
+  app.innerHTML = `<div class="spinner">불러오는 중...</div>`;
+  let d;
+  try{
+    const res = await fetch(`${API}/api/dashboard`);
+    if(!res.ok) throw new Error('서버 응답 오류');
+    d = await res.json();
+  }catch(err){
+    app.innerHTML = `<div class="card empty">통계를 불러오지 못했어요.<br>${escapeHtml(err.message||'')}</div>
+      <button class="btn-ghost" id="retryBtn">다시 시도</button>`;
+    document.getElementById('retryBtn').addEventListener('click', renderDash);
+    return;
+  }
   if(!d.total){
     app.innerHTML = `<div class="card empty">아직 풀이 기록이 없어요.<br>문제를 먼저 풀어보세요!</div>`;
     return;
